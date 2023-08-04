@@ -110,6 +110,17 @@ export function fromIterable<T>(iterable: Iterable<T>) {
 }
 
 export function fromAsyncIterable<T>(asyncIterable: AsyncIterable<T>) {
+  async function process<T>(asyncIterable: AsyncIterable<T>, subscriber: Subscriber<T>) {
+    for await (const value of asyncIterable) {
+      subscriber.next(value);
+      // A side-effect may have closed our subscriber,
+      // check before the next iteration.
+      if (subscriber.closed) {
+        return;
+      }
+    }
+    subscriber.complete();
+  }
   return new Observable((subscriber: Subscriber<T>) => {
     process(asyncIterable, subscriber).catch((err) => subscriber.error(err));
   });
@@ -117,16 +128,4 @@ export function fromAsyncIterable<T>(asyncIterable: AsyncIterable<T>) {
 
 export function fromReadableStreamLike<T>(readableStream: ReadableStreamLike<T>) {
   return fromAsyncIterable(readableStreamLikeToAsyncGenerator(readableStream));
-}
-
-async function process<T>(asyncIterable: AsyncIterable<T>, subscriber: Subscriber<T>) {
-  for await (const value of asyncIterable) {
-    subscriber.next(value);
-    // A side-effect may have closed our subscriber,
-    // check before the next iteration.
-    if (subscriber.closed) {
-      return;
-    }
-  }
-  subscriber.complete();
 }
